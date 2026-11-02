@@ -1,0 +1,17 @@
+<!doctype html><html><head><meta charset="utf-8"><title>relais</title></head><body><script>
+// Relais du relevé TrendSaaS : la page TikTok (iframe parent) envoie ses résultats ici par postMessage,
+// et cette page les enregistre dans Supabase (la clé ci-dessous est la clé publique, elle ne permet que d'insérer).
+const SB='https://kfmfbsvvjjlrulgxxmkv.supabase.co/rest/v1/', KEY='sb_publishable_XAfjdkxZW08KMXHmsFcxaA_HFGxzlvH';
+const H={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal,resolution=ignore-duplicates'};
+const OK=/^https:\/\/(www\.)?(tiktok|instagram)\.com$/;
+window.addEventListener('message', async ev => {
+  if (!OK.test(ev.origin) || !ev.data || !ev.data.t) return;
+  const d=ev.data; let r={t:d.t, id:d.id, ok:false, st:0};
+  try {
+    if (d.t==='ping') r.ok=true;
+    else if (d.t==='run') { const x=await fetch(SB+'releve_runs',{method:'POST',headers:H,body:JSON.stringify(d.row)}); r.st=x.status; r.ok=x.ok||x.status===409; }
+    else if (d.t==='rows') { const x=await fetch(SB+'releve_rows?on_conflict=run,plat,aid',{method:'POST',headers:H,body:JSON.stringify(d.rows)}); r.st=x.status; r.ok=x.ok; if(!x.ok) r.err=(await x.text()).slice(0,200); }
+  } catch(e) { r.err=String(e).slice(0,200); }
+  ev.source.postMessage(r, ev.origin);
+});
+</script></body></html>
