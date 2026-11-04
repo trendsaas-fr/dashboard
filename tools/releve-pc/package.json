@@ -1,0 +1,9 @@
+{
+  "name": "trendsaas-releve",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Relevé des vues TikTok/Instagram des clippeurs TrendSaaS (PC Windows)",
+  "dependencies": {
+    "playwright": "1.49.1"
+  }
+}

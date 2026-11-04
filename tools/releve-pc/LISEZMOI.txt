@@ -1,0 +1,32 @@
+RELEVÉ DES VUES TRENDSAAS — PROGRAMME DU PC WINDOWS
+====================================================
+
+Ce programme lit lui-même les profils TikTok et Instagram des clippeurs
+(avec un Chrome à lui, connecté une seule fois) et dépose les vues dans la base.
+Il ne dépend ni de l'appli Claude, ni de l'extension Chrome, ni du cloud.
+Claude ne fait plus que le calcul et la publication du dashboard, 10 minutes après.
+
+INSTALLATION (une seule fois, 5 minutes)
+----------------------------------------
+1. Installe Node.js : https://nodejs.org → bouton « LTS » → suivant, suivant, terminer.
+   (Google Chrome doit aussi être installé, il l'est déjà.)
+2. Dézippe ce dossier dans  C:\trendsaas\releve   (le chemin ne doit pas changer ensuite).
+3. Clic droit sur  installer.bat  → « Exécuter en tant qu'administrateur ».
+   - il installe Playwright,
+   - il crée 3 tâches Windows : 00h10 (rapide), 13h10 et 22h10 (complets),
+   - il ouvre une fenêtre Chrome : connecte-toi à TikTok puis à Instagram, puis ferme la fenêtre.
+4. Double-clique sur  tester.bat  : il lit 5 comptes de chaque plateforme.
+   Si la dernière ligne dit « Fin … déposé dans Supabase », c'est bon.
+
+ENSUITE
+-------
+- Le PC doit rester allumé, sans veille (Paramètres → Système → Alimentation → Veille : Jamais).
+- Tu peux fermer Chrome, l'appli Claude, tout : le programme ouvre sa propre fenêtre Chrome
+  aux heures prévues et la referme à la fin.
+- Si TikTok ou Instagram te déconnecte un jour : double-clique sur  connexion.bat, reconnecte-toi, ferme.
+- Le fichier  releve.log  garde l'historique de chaque relevé (à envoyer à Claude en cas de problème).
+
+DÉSINSTALLER
+------------
+Ouvre « Planificateur de tâches » Windows et supprime les 3 tâches « TrendSaaS releve … »,
+puis supprime le dossier.
