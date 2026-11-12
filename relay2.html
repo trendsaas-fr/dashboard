@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"><title>relais fichiers</title></head><body><script>
+// Relais des vidéos du Top 5 (12/11) : la page TikTok/Instagram envoie la vidéo en morceaux base64, enregistrés dans releve_dump (clé publique : insertion seulement).
+const SB='https://kfmfbsvvjjlrulgxxmkv.supabase.co/rest/v1/', KEY='sb_publishable_XAfjdkxZW08KMXHmsFcxaA_HFGxzlvH';
+const H={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'};
+const OK=/^https:\/\/(www\.)?(tiktok|instagram)\.com$/;
+window.addEventListener('message', async ev => {
+  if (!OK.test(ev.origin) || !ev.data || ev.data.t!=='chunk') return;
+  const d=ev.data; let r={t:'chunk', run:d.run, part:d.part, ok:false, st:0};
+  try { const x=await fetch(SB+'releve_dump',{method:'POST',headers:H,body:JSON.stringify({run:d.run,part:d.part,body:d.body})}); r.st=x.status; r.ok=x.ok; if(!x.ok) r.err=(await x.text()).slice(0,200); }
+  catch(e) { r.err=String(e).slice(0,200); }
+  ev.source.postMessage(r, ev.origin);
+});
+</script></body></html>
