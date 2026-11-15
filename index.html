@@ -1541,7 +1541,12 @@ async function lvOcr(files){ const C = LVCUR; if (!C || !files || !files.length)
 document.addEventListener("change", e => { if (e.target.id==="lvShot" && TAB==="live") lvOcr([...e.target.files]); });
 document.addEventListener("paste", e => { if (TAB!=="live" || !LVCUR) return; const imgs = [...((e.clipboardData && e.clipboardData.items) || [])].filter(i => i.type && i.type.startsWith("image/")).map(i => i.getAsFile()).filter(Boolean); if (imgs.length) { e.preventDefault(); lvOcr(imgs); } });
 async function lvLoad(force){ if ((LV_TRY && !force) || !(LVT() && LVT().tk)) return; LV_TRY = true; try { LVL = await sbTeam("live_list"); } catch(_){ LVL = LVL || []; LVMSG = "❌ Lecture des lives impossible pour le moment."; } if (!LVCUR) lvPick(lvToday()); if (TAB==="live") renderMe(); }
-function lvPick(date){ const ex = (LVL||[]).find(l => l.live_date===date && !(l.winners||[]).length) || (LVL||[]).find(l => l.live_date===date); LVCUR = ex ? {id:ex.id, date:ex.live_date, present:[...(ex.present||[])], validated:!!ex.validated, winners:[...(ex.winners||[])]} : {id:null, date, present:[], validated:false, winners:[]}; }
+function lvPick(date){ const ex = (LVL||[]).find(l => l.live_date===date && !(l.winners||[]).length) || (LVL||[]).find(l => l.live_date===date); LVCUR = ex ? {id:ex.id, date:ex.live_date, present:[...(ex.present||[])], validated:!!ex.validated, winners:[...(ex.winners||[])]} : {id:null, date, present:[], validated:false, winners:[]}; lvDraftLoad(); }
+// Daniel 15/11 21h40 : la liste des présents est gardée dans le navigateur (actualisation de la page, changement d'onglet) tant que le gagnant n'est pas validé
+let LVDRAFT_LAST = "";
+function lvDraftLoad(){ try { const d = JSON.parse(localStorage.getItem("lvDraft")||"null"); if (!d || !LVCUR || d.date!==LVCUR.date || (LVCUR.winners||[]).length) return; if (d.cleared && !LVCUR.validated) { LVCUR.present = []; return; } (d.present||[]).forEach(u => { if (!LVCUR.present.some(x => fold(x)===fold(u))) { LVCUR.present.push(u); LVCUR.validated = false; } }); } catch(_){} }
+function lvDraftSave(cleared){ try { if (!LVCUR || (LVCUR.winners||[]).length) return; const s = JSON.stringify({date:LVCUR.date, present:LVCUR.present, cleared:!!cleared && !LVCUR.present.length}); if (s===LVDRAFT_LAST) return; LVDRAFT_LAST = s; localStorage.setItem("lvDraft", s); } catch(_){} }
+setInterval(() => lvDraftSave(LVCUR && !LVCUR.present.length), 1000);
 function lvEligible(){ const prev = (LVL||[]).filter(l => (l.winners||[]).length && (!LVCUR.id || l.id!==LVCUR.id)).sort((a,b) => (b.drawn_at||"").localeCompare(a.drawn_at||""))[0]; const last = new Set(((prev && prev.winners)||[]).map(fold)); return LVCUR.present.filter(u => !LV_NODRAW.includes(fold(u)) && !last.has(fold(u))); }
 const lvDays = d => [1,2].map(k => { const x = new Date(d+"T12:00:00"); x.setDate(x.getDate()+k); return x.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}); });
 const LV_MSG_ABS = "Salut chef 👋 j'ai vu que t'étais pas sur le live, je sais pas si t'étais pas dispo ou quoi, mais si t'as le temps la prochaine fois vraiment n'hésite pas 🙌\nIl y a full valeur : des explications personnalisées, on prend le temps pour tout le monde.\nEt à la fin il y a un petit jeu pour les gagnants, plus un bonus de 10 € quand tu es là 2 lives d'affilée 🔥";
@@ -1623,7 +1628,7 @@ function renderLive(box){
     ${sugg.length ? `<div class="row" style="flex-wrap:wrap;gap:6px">${sugg.map(u => `<button type="button" class="out-btn" data-lvadd="${esc(u)}">+ ${esc(u)}</button>`).join("")}</div>` : q ? `<p class="muted" style="font-size:13px;margin:0">Aucun clippeur ne commence par « ${esc(LVQ)} ».</p>` : ""}
     <details><summary class="muted" style="font-size:13px;cursor:pointer">Coller une liste de pseudos</summary><textarea id="lvPaste" rows="3" placeholder="Un pseudo par ligne ou séparés par des virgules" style="font:500 15px var(--body);color:var(--ink);background:var(--bg);border:2px solid var(--line);border-radius:12px;padding:10px 12px;width:100%;margin-top:6px"></textarea><button type="button" class="out-btn" id="lvPasteGo">Ajouter ces pseudos</button></details>
     <div style="border:2px dashed var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center"><b style="font-size:15px">📸 Colle ta capture d'écran des présents</b><span class="muted" style="font-size:13px">Copie la capture, puis fais <b>Cmd+V</b> (Mac) ou <b>Ctrl+V</b> (Windows) n'importe où sur cette page, ou clique sur le bouton. Les pseudos reconnus sont ajoutés tout seuls.</span><button type="button" class="btn" id="lvClip">📋 Coller la capture</button>${LVMSG && /capture|Lecture|reconnu/i.test(LVMSG) ? `<b style="font-size:14px">${esc(LVMSG)}</b>` : ""}<details style="width:100%"><summary class="muted" style="font-size:13px;cursor:pointer">Ou choisir un fichier</summary><input type="file" id="lvShot" accept="image/*" multiple style="font-size:14px;margin-top:6px"></details></div>`}
-    <p style="font-size:14px;margin:4px 0"><b>Présents (${C.present.length})</b>${C.validated ? " · ✅ feuille validée" : ""}</p>
+    <p style="font-size:14px;margin:4px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b>Présents (${C.present.length})</b>${C.validated ? " · ✅ feuille validée" : ""}${!drawn && C.present.length ? `<button type="button" class="out-btn" id="lvClear" style="font-size:13px">🗑️ Tout effacer</button>` : ""}</p>
     <div class="row" style="flex-wrap:wrap;gap:6px">${C.present.map(u => `<span class="out-btn" style="cursor:default">${esc(u)}${drawn ? "" : ` <b data-lvdel="${esc(u)}" style="cursor:pointer;margin-left:4px" title="Retirer">✕</b>`}</span>`).join("") || `<span class="muted" style="font-size:13px">Personne pour l'instant.</span>`}</div>
     <div id="lvWheelBox" class="card" style="margin-top:8px;padding:12px"><b>🎡 Roue des gagnants</b> <span class="muted" style="font-size:13px">${drawn ? "gagnant validé" : LVPEND ? "tirage fait · pas encore validé" : el.length+" clippeur(s) peuvent gagner"}</span>
       ${!drawn && C.present.length && !el.length ? `<div class="muted" style="text-align:center;padding:30px 0">${C.present.map(esc).join(", ")} : présent(s), mais hors tirage (Daniel, Félicien, Likzi, Lucas, Dylord et le gagnant du live précédent ne peuvent pas gagner). La roue apparaît dès que tu ajoutes un clippeur.</div>` : lvWheel(wheelNames)}
@@ -1651,7 +1656,7 @@ async function lvSave(validated){
 }
 document.addEventListener("click", async e => {
   if (TAB!=="live") return;
-  const t = e.target.closest && e.target.closest("[data-lvadd],[data-lvdel],[data-lvn],[data-lvopen],#lvNew,#lvSave,#lvVal,#lvSpin,#lvConfirm,#lvClip,#lvRef,#lvPasteGo,#lvShare,#lvCancel"); if (!t) return;
+  const t = e.target.closest && e.target.closest("[data-lvadd],[data-lvdel],[data-lvn],[data-lvopen],#lvNew,#lvSave,#lvVal,#lvSpin,#lvConfirm,#lvClip,#lvRef,#lvPasteGo,#lvShare,#lvCancel,#lvClear"); if (!t) return;
   const C = LVCUR;
   if (t.id==="lvClip") {
     try { const items = await navigator.clipboard.read(); const imgs = [];
@@ -1671,6 +1676,7 @@ document.addEventListener("click", async e => {
   if (t.id==="lvNew") { LVCUR = {id:null, date:lvToday(), present:[], validated:false, winners:[]}; LVMSG = ""; LVSPIN = ""; renderMe(); return; }
   if (t.id==="lvRef") { LVMSG = ""; await lvLoad(true); return; }
   if (t.id==="lvPasteGo") { const ALL = lvPseudos(); const miss = []; ($("lvPaste").value||"").split(/[\n,;]+/).map(s => s.trim().replace(/^@/,"")).filter(Boolean).forEach(s => { const u = ALL.find(x => fold(x)===fold(s)); if (u && LV_ADMIN.includes(fold(u))) return; if (!u) { miss.push(s); return; } if (!C.present.some(x => fold(x)===fold(u))) C.present.push(u); }); C.validated = false; LVMSG = miss.length ? "⚠️ Pseudos inconnus, à ajouter à la main : "+miss.join(", ") : "✅ Liste ajoutée."; lvR(); return; }
+  if (t.id==="lvClear") { if ((C.winners||[]).length) return; C.present = []; C.validated = false; LVPEND = null; LVSPIN = ""; LVMSG = "🗑️ Liste vidée."; lvDraftSave(true); lvR(); return; }
   if (t.id==="lvSave") { await lvSave(false); return; }
   if (t.id==="lvVal") { await lvSave(true); return; }
   if (t.id==="lvSpin") {
@@ -1816,7 +1822,7 @@ async function checkFresh(){
   try {
     const r = await fetch(location.pathname + "?check=" + Date.now(), {cache: "no-store"}); if (!r.ok) return;
     const m = (await r.text()).match(/"generatedAt":"([^"]+)"/);
-    if (m && m[1] !== DATA.generatedAt && !document.querySelector("input:focus, select:focus")) goFresh();
+    if (m && m[1] !== DATA.generatedAt && !document.querySelector("input:focus, select:focus") && TAB!=="live") goFresh();  // pas d'actualisation automatique pendant le live (Daniel 15/11)
   } catch(_){}
 }
 setInterval(checkFresh, 120000);
