@@ -1674,8 +1674,8 @@ document.addEventListener("click", async e => {
   if (t.id==="lvSave") { await lvSave(false); return; }
   if (t.id==="lvVal") { await lvSave(true); return; }
   if (t.id==="lvSpin") {
-    const el = lvEligible(); if (el.length < LVN || LVBUSY) return; LVBUSY = true; t.disabled = true; LVPEND = null; LVROT = 0; { const cb = $("lvConfirm"); if (cb) cb.disabled = true; }
-    if (LVN > 1) { const sv0 = $("lvSvg"); if (sv0 && sv0.parentNode) sv0.parentNode.outerHTML = lvWheel(el); }
+    const el0 = lvEligible(); const _prevW = (LVPEND||[]).map(fold); const _el2 = el0.filter(u => !_prevW.includes(fold(u))); const el = _el2.length >= LVN ? _el2 : el0; /* Daniel 15/11 21h30 : jamais 2 fois de suite le même gagnant en relançant */ if (el.length < LVN || LVBUSY) return; LVBUSY = true; t.disabled = true; LVPEND = null; LVROT = 0; { const cb = $("lvConfirm"); if (cb) cb.disabled = true; }
+    if (LVN > 1 || el.length !== el0.length) { const sv0 = $("lvSvg"); if (sv0 && sv0.parentNode) sv0.parentNode.outerHTML = lvWheel(el); }
     const rnd = n => { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; };
     let pool = [...el]; const win = [];
     for (let k = 0; k < LVN; k++) {
