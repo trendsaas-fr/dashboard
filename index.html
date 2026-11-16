@@ -1007,13 +1007,13 @@ function renderReg(box){
       const auto = tt.filter(n => n>=2).length >= 2;
       const g = (RGL||[]).find(x => x.pseudo===u && String(x.day).slice(0,10)===k && x.active);
       const fut = k > today;
-      const st = g ? `<b style="color:var(--good)">🎁 Accordé</b>` : auto ? `<span style="color:var(--good)">✅ Validé (règle)</span>` : fut ? `<span class="muted">à venir</span>` : `<span class="muted">⬜ Pas validé</span>`;
-      return `<button type="button" class="out-btn" data-rgday="${k}" ${fut||RGBUSY?"disabled":""} aria-pressed="${!!g}" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;${g?"border-color:var(--good);":""}"><b>${J[i]} ${dShort(k)}</b><span style="font-size:13px">TikTok : ${tt.length ? tt.join(" + ")+" vidéo(s)" : "aucune"}${ot ? ` · Insta/Snap : ${ot}` : ""}</span><span style="font-size:13px">${st}</span></button>`;
+      const st = g ? `<b style="color:var(--good)">🎁 Accordé${fut?" à l'avance":""}</b>` : auto ? `<span style="color:var(--good)">✅ Validé (règle)</span>` : fut ? `<span class="muted">à venir</span>` : `<span class="muted">⬜ Pas validé</span>`;
+      return `<button type="button" class="out-btn" data-rgday="${k}" ${RGBUSY?"disabled":""} aria-pressed="${!!g}" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;${g?"border-color:var(--good);":""}"><b>${J[i]} ${dShort(k)}</b><span style="font-size:13px">TikTok : ${tt.length ? tt.join(" + ")+" vidéo(s)" : "aucune"}${ot ? ` · Insta/Snap : ${ot}` : ""}</span><span style="font-size:13px">${st}</span></button>`;
     }).join("");
   }
   const recent = (RGL||[]).filter(x => x.active).slice(0,15).map(x => `<li>${esc(x.pseudo)} · ${dShort(String(x.day).slice(0,10))}</li>`).join("");
   box.innerHTML = `<div class="card"><h3>📅 Régularité / Live</h3>
-    <p style="font-size:14px;margin:0 0 6px"><b>1.</b> Tape le pseudo du clippeur. <b>2.</b> 📅 Régularité : clique sur un jour pour l'accorder. <b>3.</b> 🎥 Présence aux lives (juste en dessous des jours) : clique sur un live pour ajouter sa présence.</p><p class="muted" style="font-size:14px;margin:0 0 10px">Re-clique pour enlever. La règle automatique : 2 vidéos sur au moins 2 comptes TikTok le même jour. Visible tout de suite dans l'espace du clippeur (jour validé + bonus), il lui suffit de recharger sa page (sinon ça se met à jour tout seul en 1 minute).</p>
+    <p style="font-size:14px;margin:0 0 6px"><b>1.</b> Tape le pseudo du clippeur. <b>2.</b> 📅 Régularité : clique sur un jour pour l'accorder (même un jour à venir : il comptera automatiquement ce jour-là). <b>3.</b> 🎥 Présence aux lives (juste en dessous des jours) : clique sur un live pour ajouter sa présence.</p><p class="muted" style="font-size:14px;margin:0 0 10px">Enregistré dès le clic, rien à refaire. Pour enlever : 2 clics sur le jour (on te demande de confirmer). La règle automatique : 2 vidéos sur au moins 2 comptes TikTok le même jour. Visible tout de suite dans l'espace du clippeur (jour validé + bonus), il lui suffit de recharger sa page (sinon ça se met à jour tout seul en 1 minute).</p>
     <input id="rgq" class="in" placeholder="Pseudo du clippeur" value="${esc(RGQ)}" autocomplete="off" style="width:100%;max-width:320px">
     ${sugg.length ? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px">${sugg.map(n => `<button type="button" class="out-btn" data-rgpick="${esc(n)}">${esc(n)}</button>`).join("")}</div>` : ""}
     <div class="row" style="gap:6px;flex-wrap:wrap;margin:10px 0">${[[0,"Cette semaine"],[1,"Semaine dernière"],[2,"Il y a 2 semaines"]].map(([w,l]) => `<button type="button" data-rgw="${w}" aria-pressed="${RGW===w}" style="font-size:13px;padding:7px 12px">${l}</button>`).join("")}</div>
@@ -1023,6 +1023,7 @@ function renderReg(box){
   ${u ? `<div class="card" style="margin-top:10px"><h3>🎥 Présence aux lives · ${esc(u)}</h3><p class="muted" style="font-size:14px;margin:0 0 10px">Clique sur un live pour ajouter (ou retirer) sa présence. Le bonus de présence (10 € toutes les 2 présences d'affilée) est recalculé tout de suite dans son espace.</p>${(RGLV||[]).length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">${(RGLV||[]).slice(0,14).map(l => { const pr = (l.present||[]).some(x => fold(x)===fold(u)); const w = (l.winners||[]).some(x => fold(x)===fold(u)); return `<button type="button" class="out-btn" data-rglv="${l.id}" data-rglvon="${pr?0:1}" ${RGBUSY?"disabled":""} aria-pressed="${pr}" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;${pr?"border-color:var(--good);":""}"><b>Live ${["dim.","lun.","mar.","mer.","jeu.","ven.","sam."][new Date(l.live_date+"T12:00:00").getDay()]} ${dShort(l.live_date)}</b><span style="font-size:13px">${pr ? `<b style="color:var(--good)">✅ Présent</b>` : `<span class="muted">⬜ Absent</span>`}${w ? " · 🏆 gagnant" : ""}</span><span class="muted" style="font-size:12px">${(l.present||[]).length} présent(s)</span></button>`; }).join("")}</div>` : `<p class="muted">Aucun live validé trouvé.</p>`}</div>` : ""}
   <div class="card" style="margin-top:10px"><h3>🎁 Derniers jours accordés ici</h3>${recent ? `<ul style="margin:0;padding-left:18px">${recent}</ul>` : `<p class="muted">Aucun pour l'instant.</p>`}</div>`;
 }
+let RGCONF = ""; // Daniel 16/11 18h46 : retrait d'un jour accordé = 2 clics
 document.addEventListener("click", async e => {
   const pk = e.target.closest("[data-rgpick]"); if (pk) { RGQ = pk.dataset.rgpick; renderMe(); return; }
   const w = e.target.closest("[data-rgw]"); if (w) { RGW = +w.dataset.rgw; renderMe(); return; }
@@ -1033,6 +1034,8 @@ document.addEventListener("click", async e => {
   const b = e.target.closest("[data-rgday]"); if (!b || RGBUSY) return;
   const T = UNL && UNL.team || {}; const u = Object.keys(T.acc||{}).find(n => fold(n)===fold(RGQ)); if (!u) return;
   const k = b.dataset.rgday; const on = !(RGL||[]).some(x => x.pseudo===u && String(x.day).slice(0,10)===k && x.active);
+  if (!on && RGCONF !== u+"|"+k) { RGCONF = u+"|"+k; RGMSG = `⚠️ ${esc(u)} : ${dShort(k)} est accordé. Reclique sur ce jour pour confirmer le retrait.`; renderMe(); return; }
+  RGCONF = "";
   RGBUSY = true; RGMSG = "⏳ Enregistrement…"; renderMe();
   try { await sbTeam("reg_set", {pseudo:u, day:k, on, by:"dashboard"}); RGMSG = on ? `✅ ${esc(u)} : ${dShort(k)} accordé. Déjà visible dans son espace.` : `↩️ ${esc(u)} : ${dShort(k)} retiré.`; await rgLoad(); }
   catch(_){ RGMSG = "❌ Pas enregistré : reclique sur le jour."+(ON_GH ? "" : " (Ouvre la version GitHub : ici les connexions sont bloquées.)"); }
