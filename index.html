@@ -1321,7 +1321,7 @@ function payCard(p){
       <div class="kpi"><span class="l">Déjà touché</span><span class="v">${eur(P.paid||0)}</span><span class="s">depuis ton arrivée</span></div>
     </div>
     ${p.compl ? `<p style="font-size:13px;margin:0;color:var(--good)">➕ <b>${fmt(p.compl.v)} vues rattrapées</b> : vues faites par tes vidéos après ta dernière demande de paiement, jamais payées jusqu'ici. <b>Déjà ajoutées automatiquement</b> (+${eur(p.compl.e)}, au ${frL(p.compl.d)}) : elles sont dans ta prochaine demande de paiement, tu n'as rien à demander en plus.</p>` : ""}
-    ${P.rc ? `<p style="font-size:13px;margin:0;color:var(--gold)">ℹ️ <b>${eur(P.rc.paid)} déjà payés sur RevClip</b> (virements du 9 au 11 novembre) : cette somme est déduite de tes vues à partir du ${frL(P.rc.from)}, elle ne peut pas être demandée une deuxième fois ici.${P.rc.left>0 ? ` Il reste ${eur(P.rc.left)} à déduire de tes prochaines vues.` : ""}</p>` : ""}
+    ${P.rc && P.rc.left>0 ? `<p style="font-size:13px;margin:0;color:var(--gold)">ℹ️ <b>${eur(P.rc.paid)} déjà payés sur RevClip</b> (virements du 9 au 11 novembre) : cette somme est déduite de tes vues à partir du ${frL(P.rc.from)}, elle ne peut pas être demandée une deuxième fois ici.${P.rc.left>0 ? ` Il reste ${eur(P.rc.left)} à déduire de tes prochaines vues.` : ""}</p>` : ""}
     ${form}
     ${TKOK ? `<p id="tkOk" style="font-size:14px;color:var(--good)"><b>${esc(TKOK)}</b></p>` : ""}
     <h3 style="font-size:16px;margin-top:6px">📨 Mes demandes</h3>
