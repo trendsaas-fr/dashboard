@@ -133,6 +133,7 @@ body.loading #me{opacity:.45;transition:opacity .3s}
 .topv:hover{border-color:var(--accent)}
 .topvid{display:grid;gap:8px;padding:10px;border-radius:14px;background:var(--bg);border:1px solid var(--line)}
 .topvid video{width:100%;max-width:340px;aspect-ratio:9/16;border-radius:10px;background:#000;justify-self:center;object-fit:cover}
+.topvid .dlvid{justify-self:center;width:100%;max-width:340px;cursor:pointer}
 .topvid .tvc{display:flex;gap:8px;align-items:center;justify-content:center;font-size:17px}
 .topv .medal{font-size:24px}
 .tv{display:flex;flex-direction:column;min-width:0}
@@ -457,10 +458,28 @@ function renderTop(){
   $("top5").hidden = true;  // décision de Daniel (27/10) : jamais de compte ni de lien TikTok affiché, même pour l'équipe (espions qui signalent)
   $("top5List").innerHTML = [].map((v,i) => `<a class="topv" href="${esc(v.url)}" target="_blank" rel="noopener"><span class="medal">${i<3?["🥇","🥈","🥉"][i]:`<b style="font:900 18px var(--display)">${i+1}</b>`}</span><span class="tv"><b>${fmt(v.v)} vues</b><span class="muted">${esc(v.u)} · @${esc(v.h)} · postée le ${dShort(v.d)}</span></span><span class="go">Ouvrir ↗</span></a>`).join("");
   const topHTML = L => L.map((v,i) => v.src
-    ? `<div class="topvid">${ON_GH ? `<video src="${esc(v.src)}" poster="${esc(v.src.replace(/\.mp4$/,".jpg"))}" controls playsinline preload="none"></video>` : `<a class="btn" style="text-align:center;text-decoration:none" href="https://trendsaas-fr.github.io/dashboard/" target="_blank" rel="noopener">▶ Voir la vidéo (version site)</a>`}<div class="tvc"><span class="medal">${["🥇","🥈","🥉"][i]||`<b>${i+1}</b>`}</span><b>${fmt(v.v)} vues</b>${v.d?`<span class="muted" style="font-size:14px">· postée ${ago(v.d)}</span>`:""}</div></div>`
+    ? `<div class="topvid">${ON_GH ? `<video src="${esc(v.src)}" poster="${esc(v.src.replace(/\.mp4$/,".jpg"))}" controls playsinline preload="none"></video><button type="button" class="btn dlvid" data-src="${esc(v.src)}" data-dlvid="1">⬇️ Enregistrer la vidéo</button>` : `<a class="btn" style="text-align:center;text-decoration:none" href="https://trendsaas-fr.github.io/dashboard/" target="_blank" rel="noopener">▶ Voir la vidéo (version site)</a>`}<div class="tvc"><span class="medal">${["🥇","🥈","🥉"][i]||`<b>${i+1}</b>`}</span><b>${fmt(v.v)} vues</b>${v.d?`<span class="muted" style="font-size:14px">· postée ${ago(v.d)}</span>`:""}</div></div>`
     : `<div class="topv"><span class="medal">${["🥇","🥈","🥉"][i]||`<b style="font:900 18px var(--display)">${i+1}</b>`}</span><span class="tv"><b>${fmt(v.v)} vues</b>${v.d?`<span class="muted">postée le ${dShort(v.d)}</span>`:""}</span></div>`).join("");
   $("topList").innerHTML = topHTML(TOP); $("topAllList").innerHTML = topHTML(TOPA);
 }
+// Daniel 20/11 : bouton pour enregistrer la vidéo du top (sans filigrane) dans la galerie du téléphone
+async function saveVid(b){
+  const src=b.dataset.src, lab=b.textContent, name="trendsaas-top-"+(src.split("/").pop()||"video.mp4");
+  b.disabled=true; b.textContent="⏳ Préparation…";
+  try{
+    const r=await fetch(src); if(!r.ok) throw 0;
+    const blob=await r.blob(), file=new File([blob],name,{type:"video/mp4"});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file]}); b.textContent="✅ Choisis « Enregistrer la vidéo »"; }
+      catch(e){ b.textContent=lab; }
+    } else {
+      const u=URL.createObjectURL(blob), a=document.createElement("a"); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(u),60000); b.textContent="✅ Vidéo téléchargée";
+    }
+  }catch(e){ b.textContent="❌ Réessaie"; }
+  setTimeout(()=>{b.disabled=false; if(b.textContent!==lab) b.textContent=lab;},4000);
+}
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-dlvid]"); if (b) saveVid(b); });
 function nextUpd(){ const g=String(DATA.shownAt||DATA.generatedAt||""), hm=g.slice(11,16); const S=["01:00","14:30","23:30"]; const n=S.find(s=>s>hm); return n ? n.replace(":","h") : "01h00"; }
 function lastUpd(){ const g=String(DATA.shownAt||DATA.generatedAt||"");  /* Daniel 02/11 : une mise à jour à la main garde l'heure de la dernière actualisation officielle */ return g.slice(8,10)+"/"+g.slice(5,7)+" à "+g.slice(11,16).replace(":","h"); }
 // Relevé en direct (Daniel 02/11) : pendant le relevé, chaque compte affiche ✅ relevé / en cours / en attente, et la case « Dernière actualisation » affiche « En cours »
