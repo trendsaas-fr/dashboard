@@ -670,7 +670,7 @@ function renderMe(){
   renderTop();
   const box = $("me"); if (!ME) { box.hidden = true; $("logout").hidden = true; return; }
   box.classList.remove("cols");
-  if (UNL && ((UNL.team && ["dash","rev","clip","hist","supa","live","reg","roue"].includes(TAB)) || (UNL.lvt && TAB==="live"))) { $("topCard").hidden = true; $("topAllCard").hidden = true; $("top5").hidden = true; $("rulesCard").hidden = true; $("lbCard").hidden = true; box.hidden = false; $("pick").hidden = true; $("how").hidden = true; renderTeam(); bindChange(); return; }
+  if (UNL && ((UNL.team && ["dash","rev","clip","hist","supa","live","reg","roue","par"].includes(TAB)) || (UNL.lvt && TAB==="live"))) { $("topCard").hidden = true; $("topAllCard").hidden = true; $("top5").hidden = true; $("rulesCard").hidden = true; $("lbCard").hidden = true; box.hidden = false; $("pick").hidden = true; $("how").hidden = true; renderTeam(); bindChange(); return; }
   if (UNL && (TAB==="top" || TAB==="lb")) { box.hidden = true; $("pick").hidden = true; $("how").hidden = true; bindChange(); return; }
   if (UNL && UNL.admin && UNL.p && !UNL.p.accounts.length && (TAB==="me" || TAB==="pay")) {
     box.hidden = false; $("pick").hidden = true; $("how").hidden = true;
