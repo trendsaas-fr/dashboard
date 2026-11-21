@@ -858,7 +858,7 @@ function tabList(){
   try { if (UNL && UNL.team) rvLoad(); } catch(_){}
   const nRv = (RVD && UNL && UNL.team) ? (UNL.team.rv||[]).filter(v => rvSt(v)==="todo").length : 0;
   const team = [["dash","📈 Tableau de bord"],["rev",`🎬 Review vidéo${nRv ? ` (${nRv})` : ""}`],["clip","🔎 Chercher clippeur ou compte"],["hist",`🧾 Historique paiements${nTodo ? ` <span class="nbadge">${nTodo}</span>` : ""}`],["supa",`🛟 Demandes support${nSup ? ` <span class="nbadge">${nSup}</span>` : ""}`]];
-  if (isDaniel()) team.push(["reg","📅 Régularité / Live"]); team.push(["live","🎥 Live quotidien"]); team.push(["roue","🎡 Roue du jour"]);  // Daniel 15/11 22h16 : « Régularité » visible seulement par Daniel
+  if (isDaniel()) team.push(["reg","📅 Régularité / Live"]); team.push(["live","🎥 Live quotidien"]); team.push(["roue","🎡 Roue du jour"]); if (canPar()) team.push(["par","🤝 Parrainage"]);  // Daniel 15/11 22h16 : « Régularité » visible seulement par Daniel
   if (UNL && UNL.lvt && !UNL.team) return [...base, ["live","🎥 Live quotidien"]];
   if (UNL && (UNL.team || UNL.admin)) return [...base.filter(x => x[0]!=="sup"), ...team];  // Daniel 12/11 : l'équipe n'utilise pas « Support », seulement « Demandes support »
   return base;
@@ -869,7 +869,7 @@ function setTabs(){
   let h = L.map(([k,l]) => `<button type="button" data-tab="${k}" aria-pressed="${k===TAB}">${l}</button>`).join("");
   if (UNL && (UNL.team || UNL.admin)) {  // Daniel 12/11 : trop de cases -> 4 groupes pour l'équipe, avec les sous-onglets du groupe ouvert en dessous
     const lab = Object.fromEntries(L); lab.lb = "🏆 Classement & règles"; lab.me = "📊 Mon espace"; lab.clip = "🔎 Chercher un clippeur";
-    const G = [["📊 Moi",["me","pay"]],["🏆 Équipe",["lb","dash"]],["🛠 Gestion",["rev","hist","supa","clip","reg"]],["🎥 Live",["live","roue"]]].map(([n,ks]) => [n, ks.filter(k => lab[k])]).filter(g => g[1].length);
+    const G = [["📊 Moi",["me","pay"]],["🏆 Équipe",["lb","dash"]],["🛠 Gestion",["rev","hist","supa","clip","reg"]],["🎥 Live",["live","roue"]],["🤝 Parrainage",["par"]]].map(([n,ks]) => [n, ks.filter(k => lab[k])]).filter(g => g[1].length);
     const cur = G.find(g => g[1].includes(TAB)) || G[0]; GLAST[cur[0]] = TAB;
     const cnt = ks => ks.reduce((s,k) => { const m = /nbadge">(\d+)<|\((\d+)\)/.exec(lab[k]||""); return s + (m ? +(m[1]||m[2]) : 0); }, 0);
     h = G.map(([n,ks]) => { const to = ks.includes(GLAST[n]) ? GLAST[n] : ks[0]; const c = n===cur[0] ? 0 : cnt(ks); return `<button type="button" data-tab="${to}" aria-pressed="${n===cur[0]}">${n}${c ? ` <span class="nbadge">${c}</span>` : ""}</button>`; }).join("")
@@ -1090,15 +1090,101 @@ function renderTeam(){
   else if (TAB==="live") renderLive(box);
   else if (TAB==="roue") renderRoue(box);
   else if (TAB==="reg") renderReg(box);
+  else if (TAB==="par") renderPar(box);
   else box.innerHTML = `<div class="card" style="text-align:center;padding:32px 16px"><div style="font-size:44px">🛠️</div><h3>Site aperçu : en maintenance</h3><p class="muted">Cette partie arrive bientôt. Le site n'est pas encore relié au dashboard pour le moment.</p></div>`;
 }
 document.addEventListener("click", e => { const b = e.target.closest("[data-rg]"); if (b) { RG = b.dataset.rg; renderMe(); } const g = e.target.closest("[data-go]"); if (g) { TAB = g.dataset.go; renderMe(); window.scrollTo({top:0}); } });
 document.addEventListener("input", e => { if (e.target.id==="rgq") { RGQ = e.target.value; const pos = e.target.selectionStart; renderMe(); const i = $("rgq"); if (i) { i.focus(); try { i.setSelectionRange(pos,pos); } catch(_){} } return; } if (e.target.id==="caIn") { CA[RG] = e.target.value; try { localStorage.setItem("ts_ca", JSON.stringify(CA)); } catch(_){} if (LASTS) $("caOut").innerHTML = caSplit(LASTS[0], LASTS[1]); return; } if (e.target.id==="hq") { HQ = e.target.value; const pos = e.target.selectionStart; renderMe(); const i = $("hq"); if (i) { i.focus(); try { i.setSelectionRange(pos,pos); } catch(_){} } } });
 
+// ---------- PARRAINAGE (Daniel 21/11 16h05) : Daniel et Lucas relient un parrain et un filleul ; si le filleul a eu 7 jours de régularité d'affilée (n'importe quel jour de départ), ils valident 40 € qui s'ajoutent au prochain ticket du parrain (table Supabase trendsaas_parrainages)
+const canPar = () => !!(UNL && UNL.p && ["daniel","lucas"].includes(fold(UNL.p.u||"")));
+const PRPUB = {};
+async function parPubLoad(u){ try { const r = await fetch(SBU+"rpc/trendsaas_parrain_public", {method:"POST", headers:{"apikey":SBK, "Content-Type":"application/json"}, body: JSON.stringify({p_pseudo:u})}); if (!r.ok) return; const L = await r.json(); const ch = JSON.stringify(L) !== JSON.stringify(PRPUB[u]||null); PRPUB[u] = L; if (ch && UNL && UNL.p && UNL.p.u===u && TAB==="me") renderMe(); } catch(_){} }
+function parPub(p){
+  const L = PRPUB[p.u]; if (!Array.isArray(L) || !L.length) return; const PDm = (p.pay||{}).pd; if (!PDm) return;
+  const G = {}; L.forEach(x => { const g = G[x.d] || (G[x.d] = [0, []]); g[0] += +x.a || 40; g[1].push(x.f); });
+  Object.entries(G).forEach(([d,[a,f]]) => { const y = PDm[d] || (PDm[d] = [0, 0]); while (y.length < 9) y.push(0); y[7] = a; y[8] = f.join(", "); });
+}
+async function sbPar(action, p){ const tk = LVT() && LVT().tk; if (!tk) throw {code:"no_key"}; const r = await fetch(SBU+"rpc/trendsaas_parrain", {method:"POST", headers:{"apikey":SBK, "Content-Type":"application/json"}, body: JSON.stringify({p_key:tk, p_action:action, p:p||{}})}); if (!r.ok) { let m = ""; try { m = (await r.json()).message || ""; } catch(_){} throw {code:"http_"+r.status, msg:m}; } return r.json(); }
+let PARL = null, PAR_TRY = false, PARA = "", PARF = "", PARMSG = "", PARBUSY = false, PARCONF = "";
+async function parLoad(){ try { PARL = await sbPar("list"); } catch(_){ PARMSG = "❌ Impossible de lire les parrainages."+(ON_GH ? "" : " (Ouvre la version GitHub : ici les connexions sont bloquées.)"); } if (TAB==="par" || TAB==="hist") renderMe(); }
+function parRows(u){ if (!PAR_TRY && UNL && UNL.team) { PAR_TRY = true; parLoad(); } return (PARL||[]).filter(x => x.active && fold(x.parrain)===fold(u)); }
+// jour « vert » = 2 vidéos sur au moins 2 comptes TikTok, ou jour de régularité accordé à la main
+function parGreen(u, k){
+  const accs = ((UNL.team||{}).acc||{})[u] || [];
+  const tt = accs.filter(a => a.p==="TikTok").map(a => ((a.d||{})[k]||[0,0])[1]||0);
+  if (tt.filter(n => n>=2).length >= 2) return "auto";
+  return (RGL||[]).some(x => x.pseudo===u && String(x.day).slice(0,10)===k && x.active) ? "main" : "";
+}
+function parCheck(u){
+  const accs = ((UNL.team||{}).acc||{})[u] || []; const today = todayP();
+  let first = today; accs.forEach(a => Object.keys(a.d||{}).forEach(k => { if (k < first) first = k; }));
+  (RGL||[]).forEach(x => { const k = String(x.day).slice(0,10); if (x.pseudo===u && x.active && k < first) first = k; });
+  let run = 0, s0 = null, best = {n:0, from:null, to:null}, ok = null;
+  for (let k = first; k <= today; k = addD(k, 1)) {
+    if (parGreen(u, k)) { if (!run) s0 = k; run++; if (run > best.n) best = {n:run, from:s0, to:k}; if (run >= 7 && !ok) ok = {from:addD(k,-6), to:k}; }
+    else run = 0;
+  }
+  return {ok, best, first};
+}
+function renderPar(box){
+  if (!canPar()) { box.innerHTML = `<div class="card"><p class="muted">Réservé à Daniel et Lucas.</p></div>`; return; }
+  if (!PAR_TRY) { PAR_TRY = true; parLoad(); }
+  if (!RG_TRY) { RG_TRY = true; rgLoad(); }
+  const T = UNL.team || {}; const names = Object.keys(T.acc||{}).sort((a,b)=>a.localeCompare(b));
+  const pick = q => names.find(n => fold(n)===fold(q)) || null;
+  const A = pick(PARA), F = pick(PARF);
+  const dl = `<datalist id="parNames">${names.map(n => `<option value="${esc(n)}">`).join("")}</datalist>`;
+  let res = "";
+  if (PARA && !A) res += `<p style="color:var(--bad)">Parrain « ${esc(PARA)} » introuvable : choisis un pseudo dans la liste.</p>`;
+  if (PARF && !F) res += `<p style="color:var(--bad)">Filleul « ${esc(PARF)} » introuvable : choisis un pseudo dans la liste.</p>`;
+  if (A && F) {
+    if (fold(A)===fold(F)) res = `<p style="color:var(--bad)">Le parrain et le filleul sont la même personne.</p>`;
+    else {
+      const dej = (PARL||[]).find(x => x.active && fold(x.filleul)===fold(F));
+      const c = parCheck(F); const today = todayP();
+      const grid = []; for (let i = 20; i >= 0; i--) { const k = addD(today, -i); const g = parGreen(F, k); grid.push(`<div style="padding:6px 4px;border:1px solid var(--line);border-radius:8px;text-align:center;font-size:12px;${g?"border-color:var(--good);":""}"><b>${dShort(k)}</b><br>${g==="auto" ? "✅" : g==="main" ? "🎁" : "⬜"}</div>`); }
+      const verdict = c.ok ? `<p style="color:var(--good);font-size:16px;margin:0"><b>✅ Éligible : ${esc(F)} a fait 7 jours de régularité d'affilée, du ${frL(c.ok.from)} au ${frL(c.ok.to)}.</b></p>`
+        : `<p style="color:var(--bad);font-size:16px;margin:0"><b>❌ Pas encore éligible :</b> sa meilleure série est de ${c.best.n} jour${c.best.n>1?"s":""} d'affilée${c.best.n ? ` (du ${frL(c.best.from)} au ${frL(c.best.to)})` : ""}. Il en faut 7.</p>`;
+      const btn = dej ? `<p style="color:var(--gold);margin:0"><b>⚠️ Bonus déjà validé pour ${esc(F)}</b> (parrain : ${esc(dej.parrain)}, le ${frL(String(dej.created_at).slice(0,10))}). Un filleul ne rapporte qu'une fois.</p>`
+        : c.ok ? `<button class="btn" type="button" id="parAdd" ${PARBUSY?"disabled":""}>✅ Je valide le bonus de parrainage de 40 € pour ${esc(A)}</button>` : "";
+      res = `<div class="card" style="margin-top:10px"><h3>🔎 ${esc(F)} (filleul de ${esc(A)})</h3>${verdict}
+        <p class="muted" style="font-size:13px;margin:6px 0">Règle : 2 vidéos sur au moins 2 comptes TikTok le même jour (✅), ou jour accordé à la main dans Régularité (🎁), 7 jours de suite, à partir de n'importe quel jour. Les 21 derniers jours :</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px">${grid.join("")}</div>
+        <div style="margin-top:12px">${btn}</div></div>`;
+    }
+  }
+  const act = (PARL||[]).filter(x => x.active);
+  const list = act.length ? `<div class="tbl"><table><thead><tr><th>Parrain</th><th>Filleul</th><th class="n">Bonus</th><th>Ajouté au ticket du</th><th></th></tr></thead><tbody>${act.map(x => `<tr><td>${esc(x.parrain)}</td><td>${esc(x.filleul)}</td><td class="n"><b>${eur(+x.amount||40)}</b></td><td>${frL(String(x.day).slice(0,10))}</td><td><button class="x" type="button" data-pardel="${x.id}">${PARCONF===String(x.id) ? "Sûr ? Reclique" : "✕ Retirer"}</button></td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">Aucun parrainage validé pour l'instant.</p>`;
+  box.innerHTML = `<div class="card"><h3>🤝 Parrainage</h3>
+    <p style="font-size:14px;margin:0 0 8px"><b>1.</b> Tape le pseudo du <b>parrain</b> (celui qui a ramené quelqu'un) et du <b>filleul</b>. <b>2.</b> Clique sur Vérifier : le dashboard regarde si le filleul a eu 7 jours de régularité d'affilée. <b>3.</b> Si c'est bon, valide : 40 € s'ajoutent tout de suite au prochain ticket du parrain, écrits « parrainage (pseudo du filleul) ».</p>
+    ${dl}<div class="row" style="gap:8px;flex-wrap:wrap"><input id="parA" class="in" list="parNames" placeholder="Pseudo du parrain" value="${esc(PARA)}" autocomplete="off" style="flex:1;min-width:150px"><input id="parF" class="in" list="parNames" placeholder="Pseudo du filleul" value="${esc(PARF)}" autocomplete="off" style="flex:1;min-width:150px"><button class="btn" type="button" id="parGo">🔎 Vérifier</button></div>
+    ${PARMSG ? `<p style="margin:10px 0 0">${PARMSG}</p>` : ""}${res}</div>
+  <div class="card" style="margin-top:10px"><h3>✅ Parrainages validés</h3>${list}</div>`;
+}
+document.addEventListener("click", async e => {
+  if (e.target.id==="parGo") { PARA = ($("parA")||{}).value||""; PARF = ($("parF")||{}).value||""; PARMSG = ""; renderMe(); return; }
+  if (e.target.id==="parAdd" && !PARBUSY) {
+    const T = UNL.team || {}; const names = Object.keys(T.acc||{}); const A = names.find(n => fold(n)===fold(PARA)), F = names.find(n => fold(n)===fold(PARF)); if (!A || !F) return;
+    const c = parCheck(F); if (!c.ok) return;
+    // jour du bonus : aujourd'hui, ou le lendemain de la dernière demande du parrain si elle couvre déjà aujourd'hui (un jour déjà demandé n'est jamais repayé)
+    let day = todayP(); try { reqList().filter(r => fold(r.discord)===fold(A) && r.status!=="refused" && r.to).forEach(r => { const n = addD(String(r.to).slice(0,10), 1); if (n > day) day = n; }); } catch(_){}
+    PARBUSY = true; PARMSG = "⏳ Enregistrement…"; renderMe();
+    try { await sbPar("add", {parrain:A, filleul:F, day, run_from:c.ok.from, run_to:c.ok.to, by:(UNL.p && UNL.p.u) || "équipe"}); PARMSG = `✅ Bonus de parrainage de 40 € validé pour <b>${esc(A)}</b> (filleul : ${esc(F)}). Il apparaît dans son prochain ticket${day > todayP() ? ` (à partir du ${frL(day)}, après sa dernière demande)` : ""}.`; await parLoad(); }
+    catch(err){ PARMSG = "❌ Pas enregistré"+(err && err.msg ? " : "+esc(err.msg) : "")+"."+(ON_GH ? "" : " (Ouvre la version GitHub : ici les connexions sont bloquées.)"); }
+    PARBUSY = false; renderMe(); return;
+  }
+  const d = e.target.closest && e.target.closest("[data-pardel]"); if (d && !PARBUSY) {
+    const id = d.dataset.pardel; if (PARCONF !== id) { PARCONF = id; renderMe(); return; }
+    PARCONF = ""; PARBUSY = true; renderMe();
+    try { await sbPar("del", {id:+id}); PARMSG = "↩️ Parrainage retiré."; await parLoad(); } catch(_){ PARMSG = "❌ Pas retiré : reclique."; }
+    PARBUSY = false; renderMe();
+  }
+});
 // ---------- RÉGULARITÉ ACCORDÉE À LA MAIN (Daniel 15/11 22h01) : pseudo + clic sur les jours -> table Supabase trendsaas_reg_grants, prise en compte au rafraîchissement suivant
 const isDaniel = () => !!(UNL && UNL.p && fold(UNL.p.u||"")==="daniel");
 let RGLV = [], RGQ = "", RGW = 0, RGL = [], RG_TRY = false, RGMSG = "", RGBUSY = false;
-async function rgLoad(){ try { RGL = await sbTeam("reg_list"); RGLV = (await sbTeam("live_list")).filter(l => l.validated && l.id!==1); RGMSG = ""; } catch(_){ RGMSG = "❌ Impossible de lire les jours accordés."+(ON_GH ? "" : " (Ouvre la version GitHub : ici les connexions sont bloquées.)"); } if (TAB==="reg") renderMe(); }
+async function rgLoad(){ try { RGL = await sbTeam("reg_list"); RGLV = (await sbTeam("live_list")).filter(l => l.validated && l.id!==1); RGMSG = ""; } catch(_){ RGMSG = "❌ Impossible de lire les jours accordés."+(ON_GH ? "" : " (Ouvre la version GitHub : ici les connexions sont bloquées.)"); } if (TAB==="reg" || TAB==="par") renderMe(); }
 function renderReg(box){
   if (!isDaniel()) { box.innerHTML = `<div class="card"><p class="muted">Réservé à Daniel.</p></div>`; return; }
   if (!RG_TRY) { RG_TRY = true; rgLoad(); }
@@ -1172,11 +1258,11 @@ function dwPub(p, wk){
   p.dayW = nb; if (diff) { p.total = Math.round((p.total+diff)*100)/100; if (p.withReg!=null) p.withReg = Math.round((p.withReg+diff)*100)/100; }
   const PDm = (p.pay||{}).pd; if (PDm) L.forEach(d => { const y = PDm[d] || (PDm[d] = [0, 0]); while (y.length < 5) y.push(0); if (!y[4]) y[4] = 10; });
 }
-async function regPubLoad(u){ lvPubLoad(u); dwPubLoad(u); try { const r = await fetch(SBU+"rpc/trendsaas_reg_public", {method:"POST", headers:{"apikey":SBK, "Content-Type":"application/json"}, body: JSON.stringify({p_pseudo:u})}); if (!r.ok) return; const L = await r.json(); const ch = JSON.stringify(L) !== JSON.stringify(RGPUB[u]||[]); RGPUB[u] = L; if (ch && UNL && UNL.p && UNL.p.u===u && TAB==="me") renderMe(); } catch(_){} }
+async function regPubLoad(u){ lvPubLoad(u); dwPubLoad(u); parPubLoad(u); try { const r = await fetch(SBU+"rpc/trendsaas_reg_public", {method:"POST", headers:{"apikey":SBK, "Content-Type":"application/json"}, body: JSON.stringify({p_pseudo:u})}); if (!r.ok) return; const L = await r.json(); const ch = JSON.stringify(L) !== JSON.stringify(RGPUB[u]||[]); RGPUB[u] = L; if (ch && UNL && UNL.p && UNL.p.u===u && TAB==="me") renderMe(); } catch(_){} }
 function regPub(p, wk){
   if (!p || !p.u) return; const now = Date.now(); const U = p.u;
   if (!RGPUB_T[U] || now-RGPUB_T[U] > 60e3) { RGPUB_T[U] = now; regPubLoad(U); }
-  lvPub(p, wk); dwPub(p, wk);
+  lvPub(p, wk); dwPub(p, wk); parPub(p);
   const G = RGPUB[U] || []; if (!G.length || !p.dayOk) return;
   let ch = false; wk.days.forEach((k,i) => { if (G.includes(k) && p.dayOk[i]!==true && k <= (wk.today||k)) { p.dayOk[i] = true; ch = true; } });
   if (!ch) return;
@@ -1196,15 +1282,15 @@ const frD = s => s ? pd(s).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-di
 const frL = s => s ? pd(s).toLocaleDateString("fr-FR",{day:"numeric",month:"long"}) : "";
 function lastFull(){ return DATA.lastDay; }  // aujourd'hui inclus : la demande peut se faire quand on veut
 const PLACE = {30:"1re place", 20:"2e place", 10:"3e place"};
-const topLines = c => [...(c.tops||[]).map(([m,a]) => `+ ${eur(a)} bonus ${PLACE[a]||"podium"} (semaine du ${frL(m)})`), ...(c.xl||[]), ...(c.mnl||[]).map(([d,a,t]) => `+ ${eur(a)} ${t}`)];
+const topLines = c => [...(c.tops||[]).map(([m,a]) => `+ ${eur(a)} bonus ${PLACE[a]||"podium"} (semaine du ${frL(m)})`), ...(c.xl||[]), ...(c.mnl||[]).map(([d,a,t]) => `+ ${eur(a)} ${t}`), ...(c.prl||[]).map(([d,a,f]) => `+ ${eur(a)} parrainage (${f})`)];
 function payCalc(pdm, wb, from, to){
   let v = 0, g = 0;
-  let dj = 0; const djl = []; let lb = 0; const lbl = []; let dw = 0; const dwl = []; let mn = 0; const mnl = [];
-  for (let d = from; d <= to; d = addD(d, 1)) { const x = (pdm||{})[d]; if (x) { v += x[0]; g += x[1]; if (x[2]) { dj += x[2]; djl.push([d, x[2]]); } if (x[3]) { lb += x[3]; lbl.push([d, x[3]]); } if (x[4]) { dw += x[4]; dwl.push([d, x[4]]); } if (x[5]) { mn += x[5]; mnl.push([d, x[5], x[6] || "bonus ajouté par l'équipe"]); } } }
+  let dj = 0; const djl = []; let lb = 0; const lbl = []; let dw = 0; const dwl = []; let mn = 0; const mnl = []; let pr = 0; const prl = [];
+  for (let d = from; d <= to; d = addD(d, 1)) { const x = (pdm||{})[d]; if (x) { v += x[0]; g += x[1]; if (x[7]) { pr += x[7]; prl.push([d, x[7], x[8] || ""]); } if (x[2]) { dj += x[2]; djl.push([d, x[2]]); } if (x[3]) { lb += x[3]; lbl.push([d, x[3]]); } if (x[4]) { dw += x[4]; dwl.push([d, x[4]]); } if (x[5]) { mn += x[5]; mnl.push([d, x[5], x[6] || "bonus ajouté par l'équipe"]); } } }
   let reg = 0, top = 0, nreg = 0, ntop = 0, gra = 0, vir = 0, lv = 0; const tops = [], xl = [], gn = [];
   Object.entries(wb||{}).sort().forEach(([m, b]) => { if (addD(m, 6) >= from && addD(m, 6) <= to)  /* Daniel 18/11 (Shadow) : le bonus d'une semaine va dans le ticket qui contient son DIMANCHE, même si le ticket précédent s'est arrêté en milieu de semaine */ { reg += b[0]||0; top += b[1]||0; if (b[0]) nreg++; if (b[1]) { ntop++; tops.push([m, b[1]]); }
     if (b[2]) { gra += b[2]; const gd = (b[4] ? "grade "+b[4] : "bonus de grade") + (b[5] ? ` : +${Math.round(b[5]*100)} % sur tes vues` : ""); gn.push(gd); xl.push(`+ ${eur(b[2])} ${gd} (semaine du ${frL(m)})`); } if (b[3]) { vir += b[3]; const l6 = b[6]||0; lv += l6; if (b[3]-l6 > 0) xl.push(`+ ${eur(b[3]-l6)} bonus palier de vues (semaine du ${frL(m)})`); if (l6) xl.push(`+ ${eur(l6)} rémunération live (semaine du ${frL(m)})`); } } });
-  return {v, g: Math.round(g*100)/100, reg, top, nreg, ntop, tops, gra, vir, lv, xl, gn, xb: gra+vir, dj, djl, lb, lbl, dw, dwl, mn, mnl, total: Math.round((g+reg+top+gra+vir+dj+lb+dw+mn)*100)/100};
+  return {v, g: Math.round(g*100)/100, reg, top, nreg, ntop, tops, gra, vir, lv, xl, gn, xb: gra+vir, dj, djl, lb, lbl, dw, dwl, mn, mnl, pr, prl, total: Math.round((g+reg+top+gra+vir+dj+lb+dw+mn+pr)*100)/100};
 }
 async function tcode(u, from, to){ const h = await sha(norm(u)+"|"+from+"|"+to); return "TS-"+h.slice(0,6).toUpperCase(); }
 function stBadge(r){ if (r.status==="refused") return `<span style="color:var(--bad)"><b>❌ Refusé</b></span>`; if (r.status==="sent") return `<span class="plat wait">⏳ En attente de paiement</span>`; return r.status==="paid" ? `<span style="color:var(--good)"><b>✅ Payé${r.date?" le "+frL(r.date):""}</b></span>` : `<span class="plat wait">⏳ En attente</span>`; }
@@ -1424,7 +1510,7 @@ function payCard(p){
       <ol class="steps" style="font-size:14px;gap:4px"><li>1️⃣ <b>Choisis la période</b> que tu veux te faire payer (du… au…).</li><li>2️⃣ <b>Indique où te payer</b> et ton nom et prénom.</li><li>3️⃣ Clique sur <b>Créer mon ticket</b>, puis sur <b>Copier le ticket</b>.</li><li>4️⃣ Sur le <b>Discord TrendSaaS</b>, va dans le salon <b>🆘・support</b>, clique sur le bouton vert <b>« 💵 Demander un paiement »</b> et <b>colle le message</b> dans le ticket qui s'ouvre.</li></ol>
       ${(P.reqs||[]).some(r => r.status!=="refused") || myT.length ? `<p style="font-size:13px;margin:0;color:var(--gold)">🔒 Tes vues jusqu'au <b>${frL(addD(start,-1))}</b> sont déjà demandées ou payées : tu ne peux demander qu'à partir du <b>${frL(start)}</b>. Un même jour n'est jamais payé deux fois.</p>` : ""}
       <div class="row" style="flex-wrap:nowrap;gap:8px"><label class="f" style="flex:1;min-width:0">Du<input type="date" id="pf" value="${PF}" min="${start}" max="${yest}"></label><label class="f" style="flex:1;min-width:0">Au<input type="date" id="pt" value="${PT}" min="${PF}" max="${yest}"></label></div>
-      <div class="out" style="user-select:text">${fmt(c.v)} vues = <b>${eur(c.g+rcd)}</b>${rcd?`\n− ${eur(rcd)} déjà payés par RevClip`:""}${c.reg?`\n+ ${eur(c.reg)} bonus régularité (${c.nreg} semaine${c.nreg>1?"s":""})`:""}${(c.top||c.xb||c.mn)?"\n"+topLines(c).join("\n"):""}\nTotal : <b>${eur(c.total)}</b></div>
+      <div class="out" style="user-select:text">${fmt(c.v)} vues = <b>${eur(c.g+rcd)}</b>${rcd?`\n− ${eur(rcd)} déjà payés par RevClip`:""}${c.reg?`\n+ ${eur(c.reg)} bonus régularité (${c.nreg} semaine${c.nreg>1?"s":""})`:""}${(c.top||c.xb||c.mn||c.pr)?"\n"+topLines(c).join("\n"):""}\nTotal : <b>${eur(c.total)}</b></div>
       <div class="row" style="flex-wrap:nowrap;gap:8px"><label class="f" style="flex:0 0 auto;max-width:48%">Paiement sur<select id="pm">${Object.keys(PMS).map(x => `<option ${PM.t===x?"selected":""}>${x}</option>`).join("")}</select></label><label class="f" style="flex:1;min-width:0">${PMS[PM.t][0]}<input id="pmv" value="${esc(PM.v)}" placeholder="${PMS[PM.t][1]}" autocomplete="off"></label></div>
       <label class="f">Ton nom et prénom (titulaire du compte)<input id="pmn" value="${esc(PM.n||"")}" placeholder="ex. Lucas Martin" autocomplete="name"></label>
       <p class="muted" style="font-size:12px;margin:0">Reste seulement sur ton téléphone et dans le ticket que tu envoies.</p>
@@ -1464,10 +1550,10 @@ document.addEventListener("click", async e => {
     const prevR = [...(P.reqs||[]).filter(r => r.status!=="refused"), ...myTicketsLive(p.u, P)];
     if (prevR.some(r => !(PT < r.from || PF > r.to)) || PF < (P.start||"") || PT < PF) { TKC = "Ces dates ont déjà été demandées (ou payées). Choisis des jours après ta dernière demande."; TKT = ""; renderMe(); return; }
     const c = payCalc(P.pd, P.wb, PF, PT); const code = await tcode(p.u, PF, PT);
-    const bon = [c.reg ? `+${eur(c.reg)} ${c.xb!==undefined && Object.keys(P.wb||{}).some(m => m>="2026-11-09") ? "activité" : "régularité"}` : "", ...(c.tops||[]).map(([m,x]) => `+${eur(x)} ${PLACE[x]||"podium"} (semaine du ${frL(m)})`), c.gra ? `+${eur(c.gra)} ${(c.gn && c.gn.length===1) ? c.gn[0] : "grade"}` : "", (c.vir-(c.lv||0)) > 0 ? `+${eur(c.vir-(c.lv||0))} palier de vues` : "", c.lv ? `+${eur(c.lv)} rémunération live` : "", ...(c.djl||[]).map(([d,x]) => `+${eur(x)} podium journalier (${frL(d)})`), ...(c.lbl||[]).map(([d,x]) => `+${eur(x)} bonus présence live (${frL(d)})`), ...(c.dwl||[]).map(([d,x]) => `+${eur(x)} roue du jour (${frL(d)})`), ...(c.mnl||[]).map(([d,x,t]) => `+${eur(x)} ${t}`)].filter(Boolean);
+    const bon = [c.reg ? `+${eur(c.reg)} ${c.xb!==undefined && Object.keys(P.wb||{}).some(m => m>="2026-11-09") ? "activité" : "régularité"}` : "", ...(c.tops||[]).map(([m,x]) => `+${eur(x)} ${PLACE[x]||"podium"} (semaine du ${frL(m)})`), c.gra ? `+${eur(c.gra)} ${(c.gn && c.gn.length===1) ? c.gn[0] : "grade"}` : "", (c.vir-(c.lv||0)) > 0 ? `+${eur(c.vir-(c.lv||0))} palier de vues` : "", c.lv ? `+${eur(c.lv)} rémunération live` : "", ...(c.djl||[]).map(([d,x]) => `+${eur(x)} podium journalier (${frL(d)})`), ...(c.lbl||[]).map(([d,x]) => `+${eur(x)} bonus présence live (${frL(d)})`), ...(c.dwl||[]).map(([d,x]) => `+${eur(x)} roue du jour (${frL(d)})`), ...(c.mnl||[]).map(([d,x,t]) => `+${eur(x)} ${t}`), ...(c.prl||[]).map(([d,x,f]) => `+${eur(x)} parrainage (${f})`)].filter(Boolean);
     // IBAN en groupes de 4 (Daniel 09/11 : collé, l'équipe devait le retaper à la main)
     const pmv = PM.t.includes("IBAN") && /^[A-Za-z]{2}\s*\d{2}/.test(PM.v.trim()) ? PM.v.replace(/\s+/g,"").toUpperCase().replace(/(.{4})(?=.)/g,"$1 ") : PM.v.trim();
-    TKT = `🎫 Demande de paiement TrendSaaS\nPseudo : ${p.u}\nPériode : du ${frD(PF)} au ${frD(PT)}\nVues : ${fmt(c.v)}${p.compl && p.compl.d>=PF && p.compl.d<=PT ? ` (dont ${fmt(p.compl.v)} vues de complément pour la semaine du ${frL(p.compl.w)}, jamais payées)` : ""} (${eur(c.g)}${(() => { const d = P.rc ? Object.entries(P.rc.days||{}).filter(([k]) => k>=PF && k<=PT).reduce((s,[,v]) => s+v, 0) : 0; return d ? `, après déduction de ${eur(d)} déjà payés par RevClip` : ""; })()})\nBonus : ${bon.length ? bon.join(", ") : "aucun"}\nTotal : ${eur(c.total)}\nPaiement : ${PM.t} — ${pmv}\nNom et prénom : ${(PM.n||"").trim()}`;
+    TKT = `🎫 Demande de paiement TrendSaaS\nPseudo : ${p.u}\nPériode : du ${frD(PF)} au ${frD(PT)}\nVues : ${fmt(c.v)}${p.compl && p.compl.d>=PF && p.compl.d<=PT ? ` (dont ${fmt(p.compl.v)} vues de complément pour la semaine du ${frL(p.compl.w)}, jamais payées)` : ""} (${eur(c.g)}${(() => { const d = P.rc ? Object.entries(P.rc.days||{}).filter(([k]) => k>=PF && k<=PT).reduce((s,[,v]) => s+v, 0) : 0; return d ? `, après déduction de ${eur(d)} déjà payés par RevClip` : ""; })()})\nBonus : ${bon.length ? bon.join(", ") : "aucun"}\nTotal : ${eur(c.total)}${c.pr ? ` (dont ${eur(c.pr)} de parrainage : ${(c.prl||[]).map(x => x[2]).join(", ")})` : ""}\nPaiement : ${PM.t} — ${pmv}\nNom et prénom : ${(PM.n||"").trim()}`;
     TKD = {u:p.u, from:PF, to:PT, amount:c.total, views:c.v, created:todayP(), txt:TKT};
     renderMe(); const t = $("tkTxt"); if (t) t.scrollIntoView({block:"center"}); return;
   }
@@ -1555,6 +1641,7 @@ function renderHist(box){
     (c.lbl||[]).forEach(([d,x]) => L.push(`🎥 bonus présence live (${frL(d)}) : <b>${eur(x)}</b>`));
     (c.dwl||[]).forEach(([d,x]) => L.push(`🎡 roue du jour, tiré au sort parmi ceux qui ont posté (${frL(d)}) : <b>${eur(x)}</b>`));
     (c.mnl||[]).forEach(([d,x,t]) => L.push(`✍️ ${esc(t)} : <b>${eur(x)}</b>`));
+    parRows(u).filter(x => x.day>=F && x.day<=TO).forEach(x => L.push(`🤝 parrainage (${esc(x.filleul)}) : <b>${eur(+x.amount||40)}</b>`));
     (c.tops||[]).forEach(([m,x]) => L.push(`🏆 ${PLACE[x]||"podium"} (semaine du ${frL(m)}) : <b>${eur(x)}</b>`));
     if (c.gra) L.push(`🎁 bonus de grade : <b>${eur(c.gra)}</b>`); if (c.vir-(c.lv||0) > 0) L.push(`🎁 bonus palier de vues : <b>${eur(c.vir-(c.lv||0))}</b>`); if (c.lv) L.push(`🎤 rémunération live : <b>${eur(c.lv)}</b>`);
     const d = Math.round(((+r.amount||0) - c.total)*100)/100;
